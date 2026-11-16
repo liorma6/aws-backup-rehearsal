@@ -1,0 +1,56 @@
+name: Pilot verification
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pilot-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Behavioral tests without network dependencies
+        run: python -m unittest discover -s tests -v
+      - name: Explicit offline fixture run
+        run: python -m rehearsal --backend fixture --output reports/fixture
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: offline-fixture-evidence
+          path: reports/fixture/
+  emulator:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned Python SDK
+        run: python -m pip install -r requirements.txt
+      - name: Install and verify official AWS Emulator package
+        run: bash scripts/install_emulator.sh
+      - name: Execute six scenarios twice on the official emulator
+        run: python scripts/run_with_emulator.py
+      - name: Add readable execution summary
+        if: always()
+        run: |
+          if [ -f reports/emulator/run-1/report.md ]; then
+            cat reports/emulator/run-1/report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Emulator validation did not complete. No emulator pass is claimed.' >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: aws-emulator-evidence
+          path: reports/emulator/
+          if-no-files-found: warn
