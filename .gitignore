@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+.emulator/
+.env*
+reports/
+*.pem
+emulator_credentials
+*.deb
+*.rpm
+.pytest_cache/
